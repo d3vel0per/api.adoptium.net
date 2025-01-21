@@ -1,0 +1,43 @@
+name: Docker Build (AdoptOpenJDK)
+
+on:
+  workflow_dispatch:
+  push:
+   branches: [ main, production ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  docker-build:
+    if: startsWith(github.repository, 'adoptium/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Login to Azure
+        uses: ./.github/actions/azure-login
+        with:
+          AZURE_CLIENT_ID_OIDC: ${{ secrets.AZURE_CLIENT_ID_OIDC }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Detect Branch
+        run: |
+          case ${GITHUB_REF##*/} in
+            production) echo "NAMESPACE=adoptopenjdk-alt" >> $GITHUB_ENV ;;
+            *) echo "NAMESPACE=adoptopenjdk-alt-staging" >> $GITHUB_ENV ;;
+          esac
+
+      - name: Build container image and push to Azure
+        uses: ./.github/actions/docker-build
+        with:
+          DOCKER_REPO: adoptopenjdkacr.azurecr.io/azure-${{ env.NAMESPACE }}
+          DOCKER_FILE: ./deploy/Dockerfile
+          BUILD_ARGS: MAVEN_FLAGS="-Padoptopenjdk,-adoptium"
+
+      - name: Redeploy Kubernetes Updater and Frontend
+        uses: ./.github/actions/kubectl-redeploy
+        with:
+          NAMESPACE: ${{ env.NAMESPACE }}

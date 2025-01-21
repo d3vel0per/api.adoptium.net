@@ -1,0 +1,31 @@
+name: AKS and ACS login
+description: Logs in to Azure subscription and Azure Container Registry
+inputs:
+    AZURE_CLIENT_ID_OIDC:
+      description: 'Azure Client ID OIDC'
+      required: true
+    AZURE_TENANT_ID:
+      description: 'Azure Tenant ID'
+      required: true
+    AZURE_SUBSCRIPTION_ID:
+      description: 'Azure Subscription ID'
+      required: true
+runs:
+  using: composite
+  steps:
+  - name: Login to our Azure subscription.
+    uses: azure/login@a65d910e8af852a8061c627c456678983e180302 # v2.2.0
+    with:
+      client-id: ${{ inputs.AZURE_CLIENT_ID_OIDC }}
+      tenant-id: ${{ inputs.AZURE_TENANT_ID }}
+      subscription-id: ${{ inputs.AZURE_SUBSCRIPTION_ID }}
+
+  - name: Login to Azure Container Registry
+    shell: bash
+    run: az acr login --name adoptopenjdkacr
+
+  - name: Set the target Azure Kubernetes Service (AKS) cluster.
+    uses: azure/aks-set-context@feeca6405be94202afcb1c395616ff29b1811b9f # v4.0.2
+    with:
+      resource-group: adoptium-api
+      cluster-name: adoptium-api
